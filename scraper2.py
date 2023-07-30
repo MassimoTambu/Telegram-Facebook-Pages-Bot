@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import asyncio
+from typing import Any
 import telegram, threading
 from facebook_scraper import get_posts
 from datetime import datetime
@@ -11,17 +11,22 @@ import config
 import time
 import sys
 import traceback
+import logging
+import config
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, ExtBot, Application, CallbackContext, JobQueue
 
-TOKEN = config.TOKEN
-bot = telegram.Bot(TOKEN)
-
-chat_id = config.CHAT_ID
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
 fields = ['page_name', 'page_tag', 'last_post_used']
 
+CHAT_ID = config.CHAT_ID
 WAIT_SECONDS = 600
 
-async def check():
+async def check(context: ContextTypes.DEFAULT_TYPE):
     with open('pages.csv', mode='r+') as csv_file, NamedTemporaryFile(mode='w', delete=False) as tempfile:
         csv_reader = csv.DictReader(csv_file)
         csv_writer = csv.DictWriter(tempfile, fields)
@@ -54,13 +59,13 @@ async def check():
                     for image in post['images'][1:]:
                         images.append(telegram.InputMediaPhoto(image))
                     print("SEND IMAGE")
-                    await bot.send_media_group(chat_id, images)
+                    await application.bot.send_media_group(CHAT_ID, images)
                 elif post['video'] is not None:
                     print("SEND VIDEO")
-                    await bot.send_video(chat_id, post['video'], caption=message)
+                    await application.bot.send_video(CHAT_ID, post['video'], caption=message)
                 elif post['text'] is not None:
                     print("SEND MESSAGE")
-                    await bot.send_message(chat_id, message, parse_mode=telegram.constants.ParseMode.MARKDOWN_V2)
+                    await application.bot.send_message(CHAT_ID, message, parse_mode=telegram.constants.ParseMode.MARKDOWN_V2)
             if len(posts) != 0: 
                 # according to facebook-scraper devs you can get 0 posts if
                 # you get temporarily ip banned for too many requests 
@@ -68,7 +73,13 @@ async def check():
             row = {'page_name': page['page_name'], 'page_tag': page['page_tag'], 'last_post_used': page['last_post_used']}
             csv_writer.writerow(row)
     shutil.move(tempfile.name, 'pages.csv')
-    print("ASD")
-    threading.Timer(WAIT_SECONDS, check).start()
 
-asyncio.run(check())
+if __name__ == '__main__':
+    application: Application[ExtBot, CallbackContext, Any, Any, Any, JobQueue] = ApplicationBuilder().token(config.TOKEN).build()
+    if application.job_queue is not None:
+        # application.job_queue.run_repeating(callback=check, interval=10)
+        application.job_queue.run_once(callback=check, when=1)
+    else:
+        raise Exception('job_queue is none. Bot will not start without the task scheduler')
+    
+    application.run_polling()
