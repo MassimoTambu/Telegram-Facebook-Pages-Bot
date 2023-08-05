@@ -6,3 +6,5 @@ f.close()
 
 TOKEN: str = data['token']
 CHAT_ID: str = data['chat_id']
+IS_DEBUG: bool = data['debug']
+DUMP: bool = data['dump']

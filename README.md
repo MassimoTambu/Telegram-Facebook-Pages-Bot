@@ -7,6 +7,9 @@ Every post has this structure:
 [Signature] (with a name associated to the page by the user)  
 
 ## Usage
+
+Clone facebook_scraper inside third_parties
+
 ### Automatic setup
 Just run `setup.py`
 
