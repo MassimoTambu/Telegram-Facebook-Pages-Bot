@@ -1,4 +1,5 @@
 pages.csv
-cookies.txt
+cookies/**
+!cookies/.gitkeep
 bot_data.json
 dump.json

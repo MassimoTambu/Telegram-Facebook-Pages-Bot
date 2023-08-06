@@ -1,7 +1,11 @@
-import telegram, csv, shutil, config, time, sys, traceback, logging
+#!/usr/bin/env python3
 
+import telegram, csv, shutil, time, sys, traceback, logging
+
+from config import IS_DEBUG, CHAT_ID, TOKEN
 from utils import createTelegramMessage, dumpPosts
 from third_parties.facebook_scraper.facebook_scraper import get_posts
+from third_parties.facebook_scraper.facebook_scraper.exceptions import TemporarilyBanned
 
 from typing import Any
 from tempfile import NamedTemporaryFile
@@ -9,7 +13,7 @@ from telegram.ext import ApplicationBuilder, ContextTypes, ExtBot, Application, 
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.DEBUG if config.IS_DEBUG else logging.INFO
+    level=logging.DEBUG if IS_DEBUG else logging.INFO
 )
 
 fields = ['page_name', 'page_tag', 'last_post_used']
@@ -24,14 +28,18 @@ async def check(_: ContextTypes.DEFAULT_TYPE):
                 # https://github.com/kevinzg/facebook-scraper/issues/990
                 posts = list(get_posts(
                         group=page['page_tag'],
-                        start_url="https://m.facebook.com/profile.php?id="+page['page_tag'], 
+                        start_url="https://m.facebook.com/profile.php?id="+page['page_tag'],
                         pages=1,
                         timeout=10,
-                        cookies='cookies.txt',
+                        cookies='cookies/cookies.txt',
                         options={"allow_extra_requests": True}
                     )
                 )
                 logging.info("number of posts: " + str(len(posts)))
+            except TemporarilyBanned:
+                logging.warning("We have been temporarily banned. Changing cookie..")
+                #TODO
+                sys.exit()
             except OSError as err:
                 logging.warning("Got an exception while trying to retrieve posts")
                 traceback.print_exc()
@@ -57,7 +65,7 @@ async def check(_: ContextTypes.DEFAULT_TYPE):
                     logging.debug("SEND IMAGE")
                     try:
                         await application.bot.send_media_group(
-                            config.CHAT_ID,
+                            CHAT_ID,
                             images,
                             read_timeout = 5,
                             write_timeout = 20, # Default is already 20
@@ -73,7 +81,7 @@ async def check(_: ContextTypes.DEFAULT_TYPE):
                     logging.debug("SEND LOW QUALITY IMAGE")
                     try:
                         await application.bot.send_media_group(
-                            config.CHAT_ID,
+                            CHAT_ID,
                             images,
                             read_timeout = 5,
                             write_timeout = 20, # Default is already 20
@@ -85,13 +93,13 @@ async def check(_: ContextTypes.DEFAULT_TYPE):
                 elif post['video'] is not None:
                     try:
                         logging.debug("SEND VIDEO")
-                        await application.bot.send_video(config.CHAT_ID, post['video'], caption=message)
+                        await application.bot.send_video(CHAT_ID, post['video'], caption=message)
                     except Exception as err:
                         logging.warning(err)
                 elif post['text'] is not None:
                     logging.debug("SEND MESSAGE")
                     try:
-                        await application.bot.send_message(config.CHAT_ID, message, parse_mode=telegram.constants.ParseMode.MARKDOWN_V2)
+                        await application.bot.send_message(CHAT_ID, message, parse_mode=telegram.constants.ParseMode.MARKDOWN_V2)
                     except Exception as err:
                         logging.warning(err)
             if len(posts) != 0: 
@@ -103,7 +111,7 @@ async def check(_: ContextTypes.DEFAULT_TYPE):
     shutil.move(tempfile.name, 'pages.csv')
 
 if __name__ == '__main__':
-    application: Application[ExtBot, CallbackContext, Any, Any, Any, JobQueue] = ApplicationBuilder().token(config.TOKEN).build()
+    application: Application[ExtBot, CallbackContext, Any, Any, Any, JobQueue] = ApplicationBuilder().token(TOKEN).build()
     if application.job_queue is not None:
         application.job_queue.run_repeating(callback=check, interval=60, first=1)
     else:
