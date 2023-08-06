@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
-
 import telegram, csv, shutil, config, time, sys, traceback, logging
 
-from utils import dumpPosts
+from utils import createTelegramMessage, dumpPosts
 from third_parties.facebook_scraper.facebook_scraper import get_posts
 
 from typing import Any
@@ -17,7 +15,6 @@ logging.basicConfig(
 fields = ['page_name', 'page_tag', 'last_post_used']
 
 async def check(_: ContextTypes.DEFAULT_TYPE):
-    # set_user_agent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36')
     with open('pages.csv', mode='r+') as csv_file, NamedTemporaryFile(mode='w', delete=False) as tempfile:
         csv_reader = csv.DictReader(csv_file)
         csv_writer = csv.DictWriter(tempfile, fields)
@@ -45,18 +42,14 @@ async def check(_: ContextTypes.DEFAULT_TYPE):
                 else:
                     sys.exit()
             posts.sort(key = lambda x: int(x['post_id']))
+
             dumpPosts(posts)
             #! https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this (no more than 20 message per minute on the same group)
             for post in posts:
                 if int(post['post_id']) <= int(page['last_post_used']): # post already sent to channel
                     logging.info('No new posts!')
                     continue
-                post_text = telegram.helpers.escape_markdown(post['post_text'], version=2) if post['post_text'] else ''
-                if post['shared_post_url'] is not None:
-                    shared_text = '_' + telegram.helpers.escape_markdown(post['shared_text'][post['shared_text'].find('\n', post['shared_text'].find('\n')+1)+2:], version=2) + '_' if post['shared_text'] else ''
-                    message = u'\U0001F501' + ' ' + post['shared_username'] + '\n' + shared_text + '\n\n' + post_text + '\n[' + page['page_name'] + '](https://www.facebook.com/groups/' + page['page_tag'] + ')'
-                else:
-                    message = post_text + '\n[' + page['page_name'] + ']'
+                message = createTelegramMessage(post, page['page_name'])
                 if post['images'] is not None and len(post['images']) > 0:
                     images = [telegram.InputMediaPhoto(post['images'][0], caption=message, parse_mode=telegram.constants.ParseMode.MARKDOWN_V2)]
                     for image in post['images'][1:]:

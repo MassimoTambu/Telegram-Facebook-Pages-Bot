@@ -1,3 +1,4 @@
+[] Proxies for avoiding Facebook IP ban
 [] Better telegram text message
 [] Do start, stop job queue and other commands
 [] Better exception handle
