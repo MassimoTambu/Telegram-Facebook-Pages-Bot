@@ -32,7 +32,7 @@ async def check(_: ContextTypes.DEFAULT_TYPE):
                         pages=1,
                         timeout=10,
                         cookies='cookies/cookies.txt',
-                        options={"allow_extra_requests": True}
+                        options={"allow_extra_requests": False}
                     )
                 )
                 logging.info("number of posts: " + str(len(posts)))
